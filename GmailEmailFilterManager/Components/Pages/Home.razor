@@ -251,6 +251,26 @@
         if (e.Key == "Enter") AddEmail();
     }
 
-    private static bool IsValidEmail(string email) =>
-        Regex.IsMatch(email, @"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$");
+    private static bool IsValidEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        if (email.Length > 254) return false;  // RFC Limit
+
+        try
+        {
+            // .NET eingebauter Mail-Parser als erste Prüfung
+            var addr = new System.Net.Mail.MailAddress(email);
+            if (addr.Address != email) return false;
+        }
+        catch
+        {
+            return false;
+        }
+
+        // Zusätzliche Regex-Prüfung
+        return Regex.IsMatch(email,
+            @"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]" +
+            @"(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9]" +
+            @"(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$");
+    }
 }
