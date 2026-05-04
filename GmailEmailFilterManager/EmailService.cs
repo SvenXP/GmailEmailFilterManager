@@ -2,64 +2,100 @@
 
 namespace GmailEmailFilterManager.Services;
 
-public class EmailService
+public class EmailList
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; } = string.Empty;
+    public List<string> Emails { get; set; } = new();
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+}
+
+public class EmailListService
 {
     private readonly string _filePath;
-    private List<string> _emails = new();
+    private List<EmailList> _lists = new();
 
-    public EmailService(IWebHostEnvironment env)
+    private static readonly JsonSerializerOptions _json = new() { WriteIndented = true };
+
+    public EmailListService(IWebHostEnvironment env)
     {
-        // Speichert emails.json im App_Data Ordner (wird automatisch erstellt)
         var folder = Path.Combine(env.ContentRootPath, "App_Data");
         Directory.CreateDirectory(folder);
-        _filePath = Path.Combine(folder, "emails.json");
+        _filePath = Path.Combine(folder, "lists.json");
         Load();
     }
 
-    public IReadOnlyList<string> Emails => _emails.AsReadOnly();
+    public IReadOnlyList<EmailList> Lists => _lists.AsReadOnly();
 
-    /// <summary>E-Mail hinzufügen. Gibt false zurück wenn Duplikat.</summary>
-    public bool Add(string email)
+    // ── Listen-Operationen ─────────────────────────────────
+    public EmailList AddList(string name)
     {
+        var list = new EmailList { Name = name.Trim() };
+        _lists.Add(list);
+        Save();
+        return list;
+    }
+
+    public void RenameList(string id, string newName)
+    {
+        var list = _lists.FirstOrDefault(l => l.Id == id);
+        if (list is null) return;
+        list.Name = newName.Trim();
+        Save();
+    }
+
+    public void DeleteList(string id)
+    {
+        _lists.RemoveAll(l => l.Id == id);
+        Save();
+    }
+
+    // ── E-Mail-Operationen ─────────────────────────────────
+    public bool AddEmail(string listId, string email)
+    {
+        var list = _lists.FirstOrDefault(l => l.Id == listId);
+        if (list is null) return false;
         var val = email.Trim().ToLowerInvariant();
-        if (_emails.Contains(val)) return false;
-        _emails.Add(val);
+        if (list.Emails.Contains(val)) return false;
+        list.Emails.Add(val);
         Save();
         return true;
     }
 
-    public void Remove(string email)
+    public void RemoveEmail(string listId, string email)
     {
-        _emails.Remove(email);
+        var list = _lists.FirstOrDefault(l => l.Id == listId);
+        list?.Emails.Remove(email);
         Save();
     }
 
-    public void Clear()
+    public void ClearEmails(string listId)
     {
-        _emails.Clear();
+        var list = _lists.FirstOrDefault(l => l.Id == listId);
+        list?.Emails.Clear();
         Save();
     }
 
-    public string GenerateOrString() => string.Join(" OR ", _emails);
+    public string GenerateOrString(string listId)
+    {
+        var list = _lists.FirstOrDefault(l => l.Id == listId);
+        return list is null ? string.Empty : string.Join(" OR ", list.Emails);
+    }
 
-    // ── Persistenz ────────────────────────────────────────
+    // ── Persistenz ─────────────────────────────────────────
     private void Load()
     {
         if (!File.Exists(_filePath)) return;
         try
         {
             var json = File.ReadAllText(_filePath);
-            _emails = JsonSerializer.Deserialize<List<string>>(json) ?? new();
+            _lists = JsonSerializer.Deserialize<List<EmailList>>(json) ?? new();
         }
-        catch
-        {
-            _emails = new();
-        }
+        catch { _lists = new(); }
     }
 
     private void Save()
     {
-        var json = JsonSerializer.Serialize(_emails, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(_filePath, json);
+        File.WriteAllText(_filePath, JsonSerializer.Serialize(_lists, _json));
     }
 }

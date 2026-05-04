@@ -11,7 +11,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Als Singleton, damit alle Nutzer dieselbe Liste sehen
-builder.Services.AddSingleton<GmailEmailFilterManager.Services.EmailService>();
+builder.Services.AddSingleton<GmailEmailFilterManager.Services.EmailListService>();
 
 var app = builder.Build();
 
