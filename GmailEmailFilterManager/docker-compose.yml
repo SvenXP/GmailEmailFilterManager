@@ -7,13 +7,9 @@ services:
     ports:
       - "2180:8080"
     volumes:
-      # Persist emails.json outside the container
-      - email_data:/app/App_Data
+      # Lokaler Ordner statt Docker Volume
+      - ./data:/app/App_Data
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
     restart: unless-stopped
-
-volumes:
-  email_data:
-    driver: local
