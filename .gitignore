@@ -1,0 +1,13 @@
+﻿# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+
+# App Data
+App_Data/
+
+# OS
+Thumbs.db
+.DS_Store

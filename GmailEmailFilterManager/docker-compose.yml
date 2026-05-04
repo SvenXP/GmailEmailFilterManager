@@ -1,0 +1,19 @@
+services:
+  emailmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: email-manager
+    ports:
+      - "2180:8080"
+    volumes:
+      # Persist emails.json outside the container
+      - email_data:/app/App_Data
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    restart: unless-stopped
+
+volumes:
+  email_data:
+    driver: local
