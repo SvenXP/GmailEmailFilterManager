@@ -1,255 +1,282 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using System.Text.RegularExpressions
-@inject GmailEmailFilterManager.Services.EmailListService ListService
+@using GmailEmailFilterManager.Services
+@inject EmailListService ListService
+@inject AuthService Auth
+@inject IJSRuntime JS
 
 <PageTitle>Gmail Email Filter Manager</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+@if (!_initialized)
+{
+    @* Kurzer Ladescreen während Token geprüft wird *@
+    <MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-16 d-flex justify-center">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </MudContainer>
+}
+else if (!Auth.IsAuthenticated)
+{
+    <LoginPage OnLoginSuccess="OnLoginSuccess" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
 
-    <MudText Typo="Typo.h5" Class="mb-4">
-        <MudIcon Icon="@Icons.Material.Filled.Email" Class="mr-2" />
-        Gmail Email Filter Manager
-    </MudText>
+        <div style="display:flex; align-items:center; margin-bottom:1rem;">
+            <MudText Typo="Typo.h5">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Class="mr-2" />
+                Gmail Email Filter Manager
+            </MudText>
+            <MudSpacer />
+            <MudChip T="string" Icon="@Icons.Material.Filled.Person" Color="Color.Default" Size="Size.Small" Class="mr-2">
+                admin
+            </MudChip>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Logout"
+                       OnClick="Logout">
+                Abmelden
+            </MudButton>
+        </div>
 
-    <MudGrid>
+        <MudGrid>
 
-        @* ── Linke Spalte: Listen-Übersicht ── *@
-        <MudItem xs="12" md="4">
-            <MudCard Elevation="2">
-                <MudCardHeader>
-                    <CardHeaderAvatar>
-                        <MudIcon Icon="@Icons.Material.Filled.List" Color="Color.Primary" />
-                    </CardHeaderAvatar>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.subtitle1"><b>Meine Listen</b></MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @ListService.Lists.Count Liste(n)
-                        </MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudTextField @bind-Value="_newListName"
-                                  Label="Neuer Listenname"
-                                  Variant="Variant.Outlined"
-                                  Adornment="Adornment.End"
-                                  AdornmentIcon="@Icons.Material.Filled.Add"
-                                  AdornmentColor="Color.Primary"
-                                  OnAdornmentClick="CreateList"
-                                  Placeholder="z.B. Arbeit, Familie..."
-                                  OnKeyDown="@OnListKeyDown"
-                                  Margin="Margin.Dense"
-                                  Error="@(_listError != null)"
-                                  ErrorText="@_listError" />
-                </MudCardContent>
-                <MudList T="string" @bind-SelectedValue="_selectedListId" Dense="true">
-                    @foreach (var list in ListService.Lists)
-                    {
-                        <MudListItem Value="@list.Id"
-                                     OnClick="@(() => SelectList(list.Id))"
-                                     Style="@(_selectedListId == list.Id ? "background:var(--mud-palette-primary-hover)" : "")">
-                            <div style="display:flex; align-items:center; width:100%">
-                                <MudIcon Icon="@Icons.Material.Filled.Folder"
-                                         Color="@(_selectedListId == list.Id ? Color.Primary : Color.Default)"
-                                         Size="Size.Small" Class="mr-2" />
-                                <div style="flex:1; min-width:0">
-                                    <MudText Typo="Typo.body2" Style="font-weight:500">@list.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @list.Emails.Count E-Mail(s)
-                                    </MudText>
-                                </div>
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                               Size="Size.Small"
-                                               Color="Color.Error"
-                                               Title="Liste löschen"
-                                               OnClick="@(() => DeleteList(list.Id))"
-                                               OnClickStopPropagation="true" />
-                            </div>
-                        </MudListItem>
-                    }
-                    @if (!ListService.Lists.Any())
-                    {
-                        <MudListItem Disabled="true">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-style:italic">
-                                Noch keine Listen – erstelle eine oben.
-                            </MudText>
-                        </MudListItem>
-                    }
-                </MudList>
-            </MudCard>
-        </MudItem>
-
-        @* ── Rechte Spalte: Aktive Liste ── *@
-        <MudItem xs="12" md="8">
-            @if (_selectedList is null)
-            {
-                <MudPaper Elevation="0" Class="pa-12 d-flex flex-column align-center justify-center"
-                          Style="border:2px dashed var(--mud-palette-divider); border-radius:12px; min-height:300px">
-                    <MudIcon Icon="@Icons.Material.Outlined.TouchApp" Size="Size.Large" Color="Color.Tertiary" Class="mb-3" />
-                    <MudText Typo="Typo.body1" Color="Color.Secondary">
-                        Wähle eine Liste aus oder erstelle eine neue.
-                    </MudText>
-                </MudPaper>
-            }
-            else
-            {
-                @* E-Mail hinzufügen *@
-                <MudCard Elevation="2" Class="mb-4">
-                    <MudCardHeader>
-                        <CardHeaderAvatar>
-                            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.subtitle1"><b>@_selectedList.Name</b></MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @_selectedList.Emails.Count E-Mail(s) · Erstellt: @_selectedList.CreatedAt.ToString("dd.MM.yyyy")
-                            </MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        <MudGrid AlignItems="AlignItems.End">
-                            <MudItem xs="12" sm="8">
-                                <MudTextField @bind-Value="_inputEmail"
-                                              Label="E-Mail-Adresse hinzufügen"
-                                              Variant="Variant.Outlined"
-                                              Adornment="Adornment.Start"
-                                              AdornmentIcon="@Icons.Material.Filled.AlternateEmail"
-                                              AdornmentColor="Color.Primary"
-                                              Placeholder="name@beispiel.de"
-                                              InputType="InputType.Email"
-                                              Immediate="true"
-                                              Error="@(_errorMessage != null)"
-                                              ErrorText="@_errorMessage"
-                                              OnKeyDown="@OnEmailKeyDown" />
-                            </MudItem>
-                            <MudItem xs="12" sm="4">
-                                <MudButton Variant="Variant.Filled"
-                                           Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.Add"
-                                           FullWidth="true"
-                                           OnClick="AddEmail"
-                                           Class="mb-1">
-                                    Hinzufügen
-                                </MudButton>
-                            </MudItem>
-                        </MudGrid>
-                        @if (_successMessage != null)
-                        {
-                            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2"
-                                      ShowCloseIcon="true" CloseIconClicked="DismissSuccess">
-                                @_successMessage
-                            </MudAlert>
-                        }
-                    </MudCardContent>
-                </MudCard>
-
-                @* Tabelle *@
-                <MudCard Elevation="2" Class="mb-4">
-                    <MudCardContent Class="pa-0">
-                        @if (!_selectedList.Emails.Any())
-                        {
-                            <MudStack AlignItems="AlignItems.Center" Class="pa-8">
-                                <MudIcon Icon="@Icons.Material.Outlined.Inbox" Size="Size.Large" Color="Color.Tertiary" />
-                                <MudText Typo="Typo.body1" Color="Color.Secondary">
-                                    Noch keine E-Mails in dieser Liste.
-                                </MudText>
-                            </MudStack>
-                        }
-                        else
-                        {
-                            <MudTable Items="@_selectedList.Emails" Hover="true" Dense="true"
-                                      Breakpoint="Breakpoint.Xs" Elevation="0">
-                                <HeaderContent>
-                                    <MudTh Style="width:50px">#</MudTh>
-                                    <MudTh>E-Mail-Adresse</MudTh>
-                                    <MudTh Style="width:70px; text-align:right">Aktion</MudTh>
-                                </HeaderContent>
-                                <RowTemplate>
-                                    <MudTd>
-                                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                                            @(_selectedList.Emails.ToList().IndexOf(context) + 1)
-                                        </MudText>
-                                    </MudTd>
-                                    <MudTd>
-                                        <MudText Typo="Typo.body2" Style="font-family:monospace">@context</MudText>
-                                    </MudTd>
-                                    <MudTd Style="text-align:right">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                       Color="Color.Error"
-                                                       Size="Size.Small"
-                                                       Title="Entfernen"
-                                                       OnClick="@(() => RemoveEmail(context))" />
-                                    </MudTd>
-                                </RowTemplate>
-                            </MudTable>
-                        }
-                    </MudCardContent>
-                    @if (_selectedList.Emails.Any())
-                    {
-                        <MudCardActions>
-                            <MudSpacer />
-                            <MudButton Variant="Variant.Text" Color="Color.Error"
-                                       StartIcon="@Icons.Material.Filled.DeleteSweep"
-                                       OnClick="ClearEmails">
-                                Liste leeren
-                            </MudButton>
-                        </MudCardActions>
-                    }
-                </MudCard>
-
-                @* OR-String Generator *@
+            @* ── Linke Spalte: Listen ── *@
+            <MudItem xs="12" md="4">
                 <MudCard Elevation="2">
                     <MudCardHeader>
                         <CardHeaderAvatar>
-                            <MudIcon Icon="@Icons.Material.Filled.Code" Color="Color.Primary" />
+                            <MudIcon Icon="@Icons.Material.Filled.List" Color="Color.Primary" />
                         </CardHeaderAvatar>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.subtitle1"><b>OR-String generieren</b></MudText>
+                            <MudText Typo="Typo.subtitle1"><b>Meine Listen</b></MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Alle Adressen verbunden mit
-                                <code style="background:var(--mud-palette-background-grey); padding:1px 5px; border-radius:3px"> OR </code>
+                                @ListService.Lists.Count Liste(n)
                             </MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        @if (_generatedString != null)
-                        {
-                            <MudPaper Outlined="true" Class="pa-3 mb-2"
-                                      Style="word-break:break-all; font-family:monospace; font-size:0.85rem; background:var(--mud-palette-background-grey)">
-                                @_generatedString
-                            </MudPaper>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="font-style:italic">
-                                Noch kein String – klicke auf „Generieren".
-                            </MudText>
-                        }
+                        <MudTextField @bind-Value="_newListName"
+                                      Label="Neuer Listenname"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@Icons.Material.Filled.Add"
+                                      AdornmentColor="Color.Primary"
+                                      OnAdornmentClick="CreateList"
+                                      Placeholder="z.B. Arbeit, Familie..."
+                                      OnKeyDown="@OnListKeyDown"
+                                      Margin="Margin.Dense"
+                                      Error="@(_listError != null)"
+                                      ErrorText="@_listError" />
                     </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.PlayArrow"
-                                   OnClick="GenerateString"
-                                   Disabled="@(!_selectedList.Emails.Any())">
-                            Generieren
-                        </MudButton>
-                        @if (_generatedString != null)
+                    <MudList T="string" @bind-SelectedValue="_selectedListId" Dense="true">
+                        @foreach (var list in ListService.Lists)
                         {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.ContentCopy"
-                                       OnClick="CopyToClipboard" Class="ml-2">
-                                Kopieren
-                            </MudButton>
+                            <MudListItem Value="@list.Id"
+                                         OnClick="@(() => SelectList(list.Id))"
+                                         Style="@(_selectedListId == list.Id ? "background:var(--mud-palette-primary-hover)" : "")">
+                                <div style="display:flex; align-items:center; width:100%">
+                                    <MudIcon Icon="@Icons.Material.Filled.Folder"
+                                             Color="@(_selectedListId == list.Id ? Color.Primary : Color.Default)"
+                                             Size="Size.Small" Class="mr-2" />
+                                    <div style="flex:1; min-width:0">
+                                        <MudText Typo="Typo.body2" Style="font-weight:500">@list.Name</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @list.Emails.Count E-Mail(s)
+                                        </MudText>
+                                    </div>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small" Color="Color.Error"
+                                                   Title="Liste löschen"
+                                                   OnClick="@(() => DeleteList(list.Id))"
+                                                   OnClickStopPropagation="true" />
+                                </div>
+                            </MudListItem>
                         }
-                    </MudCardActions>
+                        @if (!ListService.Lists.Any())
+                        {
+                            <MudListItem Disabled="true">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-style:italic">
+                                    Noch keine Listen – erstelle eine oben.
+                                </MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
                 </MudCard>
-            }
-        </MudItem>
-    </MudGrid>
-</MudContainer>
+            </MudItem>
+
+            @* ── Rechte Spalte: Aktive Liste ── *@
+            <MudItem xs="12" md="8">
+                @if (_selectedList is null)
+                {
+                    <MudPaper Elevation="0" Class="pa-12 d-flex flex-column align-center justify-center"
+                              Style="border:2px dashed var(--mud-palette-divider); border-radius:12px; min-height:300px">
+                        <MudIcon Icon="@Icons.Material.Outlined.TouchApp" Size="Size.Large" Color="Color.Tertiary" Class="mb-3" />
+                        <MudText Typo="Typo.body1" Color="Color.Secondary">
+                            Wähle eine Liste aus oder erstelle eine neue.
+                        </MudText>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudCard Elevation="2" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.subtitle1"><b>@_selectedList.Name</b></MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @_selectedList.Emails.Count E-Mail(s) · Erstellt: @_selectedList.CreatedAt.ToString("dd.MM.yyyy")
+                                </MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudGrid AlignItems="AlignItems.End">
+                                <MudItem xs="12" sm="8">
+                                    <MudTextField @bind-Value="_inputEmail"
+                                                  Label="E-Mail-Adresse hinzufügen"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.AlternateEmail"
+                                                  AdornmentColor="Color.Primary"
+                                                  Placeholder="name@beispiel.de"
+                                                  InputType="InputType.Email"
+                                                  Immediate="true"
+                                                  Error="@(_errorMessage != null)"
+                                                  ErrorText="@_errorMessage"
+                                                  OnKeyDown="@OnEmailKeyDown" />
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Add"
+                                               FullWidth="true"
+                                               OnClick="AddEmail"
+                                               Class="mb-1">
+                                        Hinzufügen
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                            @if (_successMessage != null)
+                            {
+                                <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2"
+                                          ShowCloseIcon="true" CloseIconClicked="DismissSuccess">
+                                    @_successMessage
+                                </MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+
+                    <MudCard Elevation="2" Class="mb-4">
+                        <MudCardContent Class="pa-0">
+                            @if (!_selectedList.Emails.Any())
+                            {
+                                <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Inbox" Size="Size.Large" Color="Color.Tertiary" />
+                                    <MudText Typo="Typo.body1" Color="Color.Secondary">
+                                        Noch keine E-Mails in dieser Liste.
+                                    </MudText>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudTable Items="@_selectedList.Emails" Hover="true" Dense="true"
+                                          Breakpoint="Breakpoint.Xs" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh Style="width:50px">#</MudTh>
+                                        <MudTh>E-Mail-Adresse</MudTh>
+                                        <MudTh Style="width:70px; text-align:right">Aktion</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                @(_selectedList.Emails.ToList().IndexOf(context) + 1)
+                                            </MudText>
+                                        </MudTd>
+                                        <MudTd>
+                                            <MudText Typo="Typo.body2" Style="font-family:monospace">@context</MudText>
+                                        </MudTd>
+                                        <MudTd Style="text-align:right">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Color="Color.Error" Size="Size.Small"
+                                                           Title="Entfernen"
+                                                           OnClick="@(() => RemoveEmail(context))" />
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            }
+                        </MudCardContent>
+                        @if (_selectedList.Emails.Any())
+                        {
+                            <MudCardActions>
+                                <MudSpacer />
+                                <MudButton Variant="Variant.Text" Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.DeleteSweep"
+                                           OnClick="ClearEmails">
+                                    Liste leeren
+                                </MudButton>
+                            </MudCardActions>
+                        }
+                    </MudCard>
+
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudIcon Icon="@Icons.Material.Filled.Code" Color="Color.Primary" />
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.subtitle1"><b>OR-String generieren</b></MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Alle Adressen verbunden mit
+                                    <code style="background:var(--mud-palette-background-grey); padding:1px 5px; border-radius:3px"> OR </code>
+                                </MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (_generatedString != null)
+                            {
+                                <MudPaper Outlined="true" Class="pa-3 mb-2"
+                                          Style="word-break:break-all; font-family:monospace; font-size:0.85rem; background:var(--mud-palette-background-grey)">
+                                    @_generatedString
+                                </MudPaper>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="font-style:italic">
+                                    Noch kein String – klicke auf „Generieren".
+                                </MudText>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       OnClick="GenerateString"
+                                       Disabled="@(!_selectedList.Emails.Any())">
+                                Generieren
+                            </MudButton>
+                            @if (_generatedString != null)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.ContentCopy"
+                                           OnClick="CopyToClipboard" Class="ml-2">
+                                    Kopieren
+                                </MudButton>
+                            }
+                        </MudCardActions>
+                    </MudCard>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
 
 @code {
-    // ── State ──────────────────────────────────────────────
+    
+    private bool _initialized = false;
+
     private string _newListName = string.Empty;
     private string? _listError;
     private string? _selectedListId;
@@ -258,24 +285,46 @@
     private string? _successMessage;
     private string? _generatedString;
 
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-
     private GmailEmailFilterManager.Services.EmailList? _selectedList =>
         ListService.Lists.FirstOrDefault(l => l.Id == _selectedListId);
 
-    // ── Listen-Operationen ─────────────────────────────────
+    // ── Lifecycle: Token beim Start prüfen ─────────────────
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var token = await JS.InvokeAsync<string?>("localStorage.getItem", Auth.TokenKey);
+                Auth.ValidateToken(token);
+            }
+            catch { /* localStorage nicht verfügbar */ }
+            _initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    private void OnLoginSuccess() => StateHasChanged();
+
+    // ── Auth ───────────────────────────────────────────────
+    private async Task Logout()
+    {
+        Auth.Logout();
+        await JS.InvokeVoidAsync("localStorage.removeItem", Auth.TokenKey);
+        _selectedListId = null;
+        _generatedString = null;
+        _errorMessage = null;
+        _successMessage = null;
+    }
+
+    // ── Listen ─────────────────────────────────────────────
     private void CreateList()
     {
         _listError = null;
-        if (string.IsNullOrWhiteSpace(_newListName))
-        {
-            _listError = "Bitte einen Namen eingeben.";
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(_newListName)) { _listError = "Bitte einen Namen eingeben."; return; }
         if (ListService.Lists.Any(l => l.Name.Equals(_newListName.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
-            _listError = "Eine Liste mit diesem Namen existiert bereits.";
-            return;
+            _listError = "Eine Liste mit diesem Namen existiert bereits."; return;
         }
         var list = ListService.AddList(_newListName);
         _newListName = string.Empty;
@@ -301,31 +350,16 @@
         }
     }
 
-    // ── E-Mail-Operationen ─────────────────────────────────
+    // ── E-Mails ────────────────────────────────────────────
     private void AddEmail()
     {
         _errorMessage = null;
         _successMessage = null;
         if (_selectedListId is null) return;
-
         var val = _inputEmail.Trim().ToLowerInvariant();
-
-        if (string.IsNullOrEmpty(val))
-        {
-            _errorMessage = "Bitte gib eine E-Mail-Adresse ein.";
-            return;
-        }
-        if (!IsValidEmail(val))
-        {
-            _errorMessage = "Ungültige E-Mail-Adresse.";
-            return;
-        }
-        if (!ListService.AddEmail(_selectedListId, val))
-        {
-            _errorMessage = $"\"{val}\" ist bereits in dieser Liste.";
-            return;
-        }
-
+        if (string.IsNullOrEmpty(val)) { _errorMessage = "Bitte gib eine E-Mail-Adresse ein."; return; }
+        if (!IsValidEmail(val)) { _errorMessage = "Ungültige E-Mail-Adresse."; return; }
+        if (!ListService.AddEmail(_selectedListId, val)) { _errorMessage = $"\"{val}\" ist bereits in dieser Liste."; return; }
         _successMessage = $"\"{val}\" wurde hinzugefügt.";
         _inputEmail = string.Empty;
         _generatedString = null;
@@ -345,60 +379,32 @@
         if (_selectedListId is null) return;
         ListService.ClearEmails(_selectedListId);
         _generatedString = null;
-        _errorMessage = null;
-        _successMessage = null;
     }
 
-    // ── String generieren ──────────────────────────────────
+    // ── String ─────────────────────────────────────────────
     private void GenerateString()
     {
         if (_selectedListId is null) return;
         _generatedString = ListService.GenerateOrString(_selectedListId);
     }
 
-    // ── Kopieren ───────────────────────────────────────────
     private async Task CopyToClipboard()
     {
         if (_generatedString is null) return;
-        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _generatedString);
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _generatedString); }
+        catch { await JS.InvokeVoidAsync("fallbackCopy", _generatedString); }
     }
 
-    // ── Hilfsmethoden ──────────────────────────────────────
-    private Task DismissSuccess()
-    {
-        _successMessage = null;
-        return Task.CompletedTask;
-    }
+    // ── Helpers ────────────────────────────────────────────
+    private Task DismissSuccess() { _successMessage = null; return Task.CompletedTask; }
+    private void OnEmailKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") AddEmail(); }
+    private void OnListKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") CreateList(); }
 
-    private void OnEmailKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") AddEmail();
-    }
-
-    private void OnListKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") CreateList();
-    }
-
-    // ── E-Mail-Validierung (RFC 5322) ──────────────────────
     private static bool IsValidEmail(string email)
     {
-        // Leer oder zu lang
-        if (string.IsNullOrWhiteSpace(email)) return false;
-        if (email.Length > 254) return false;
-
-        // .NET MailAddress-Parser als erste Stufe
-        try
-        {
-            var addr = new System.Net.Mail.MailAddress(email);
-            if (addr.Address != email) return false;
-        }
-        catch
-        {
-            return false;
-        }
-
-        // Regex: gültige Zeichen, Domain mit TLD mind. 2 Buchstaben
+        if (string.IsNullOrWhiteSpace(email) || email.Length > 254) return false;
+        try { var addr = new System.Net.Mail.MailAddress(email); if (addr.Address != email) return false; }
+        catch { return false; }
         return Regex.IsMatch(email,
             @"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+" +
             @"@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" +

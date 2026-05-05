@@ -1,0 +1,113 @@
+﻿@using GmailEmailFilterManager.Services
+@inject AuthService Auth
+@inject IJSRuntime JS
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-16">
+    <MudCard Elevation="4">
+        <MudCardHeader>
+            <CardHeaderAvatar>
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Primary" Size="Size.Large" />
+            </CardHeaderAvatar>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6"><b>Anmelden</b></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Gmail Email Filter Manager</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudTextField @bind-Value="_username"
+                          Label="Benutzername"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Person"
+                          AdornmentColor="Color.Primary"
+                          Class="mb-3"
+                          OnKeyDown="@OnKeyDown" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Passwort"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Key"
+                          AdornmentColor="Color.Primary"
+                          InputType="@_passwordInputType"
+                          Adornment2="Adornment.End"
+                          AdornmentIcon2="@_passwordIcon"
+                          OnAdornmentClick2="TogglePasswordVisibility"
+                          Class="mb-3"
+                          OnKeyDown="@OnKeyDown" />
+
+            <MudCheckBox @bind-Value="_rememberMe"
+                         Label="Angemeldet bleiben"
+                         Color="Color.Primary"
+                         Size="Size.Small" />
+
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">
+                    @_errorMessage
+                </MudAlert>
+            }
+        </MudCardContent>
+        <MudCardActions Class="pa-4">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Login"
+                       OnClick="DoLogin">
+                Anmelden
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public EventCallback OnLoginSuccess { get; set; }
+
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private bool _rememberMe = true;
+    private string? _errorMessage;
+    private bool _showPassword = false;
+
+    private InputType _passwordInputType => _showPassword ? InputType.Text : InputType.Password;
+    private string _passwordIcon => _showPassword
+        ? Icons.Material.Filled.VisibilityOff
+        : Icons.Material.Filled.Visibility;
+
+    private async Task DoLogin()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMessage = "Bitte Benutzername und Passwort eingeben.";
+            return;
+        }
+        if (Auth.Login(_username, _password))
+        {
+            if (_rememberMe)
+            {
+                // Token im localStorage speichern
+                await JS.InvokeVoidAsync("localStorage.setItem",
+                    Auth.TokenKey, Auth.GetToken());
+            }
+            else
+            {
+                // Kein "Angemeldet bleiben" → nur Session (localStorage leer lassen)
+                await JS.InvokeVoidAsync("localStorage.removeItem", Auth.TokenKey);
+            }
+            await OnLoginSuccess.InvokeAsync();
+        }
+        else
+        {
+            _errorMessage = "Benutzername oder Passwort falsch.";
+            _password = string.Empty;
+        }
+    }
+
+    private void TogglePasswordVisibility() => _showPassword = !_showPassword;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+}

@@ -11,8 +11,7 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
 
     <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="YourProjectName.styles.css" />
-
+    
     <HeadOutlet />
 </head>
 
@@ -30,3 +29,17 @@
 </body>
 
 </html>
+
+<script>
+    window.fallbackCopy = function(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    };
+</script>
