@@ -1,6 +1,6 @@
 # GmailEmailFilterManager
 
-A self-hosted web application to manage Gmail email filters. Built with ASP.NET Core and deployable via Docker.
+A self-hosted web application to manage Gmail email filters. You add emails and it will create a string with all emails separated with " OR " to use it in Gmail in a filter/label.
 
 ***
 
