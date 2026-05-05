@@ -1,15 +1,16 @@
 services:
   emailmanager:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/svenxp/gmailfilter:latest
     container_name: email-manager
     ports:
       - "2180:8080"
     volumes:
-      # Lokaler Ordner statt Docker Volume
       - ./data:/app/App_Data
+    env_file:
+      - .env
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
+      - AdminUser__Username=${ADMIN_USERNAME}
+      - AdminUser__Password=${ADMIN_PASSWORD}
     restart: unless-stopped
