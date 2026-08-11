@@ -17,6 +17,10 @@ builder.Services.AddScoped<GmailEmailFilterManager.Services.AuthService>();
 // Als Singleton, damit alle Nutzer dieselbe Liste sehen
 builder.Services.AddSingleton<GmailEmailFilterManager.Services.EmailListService>();
 
+builder.Services.AddAntiforgery(options => {
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
 var app = builder.Build();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
