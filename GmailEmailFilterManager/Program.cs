@@ -1,5 +1,7 @@
 using GmailEmailFilterManager.Components;
+using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,12 @@ builder.Services.AddScoped<GmailEmailFilterManager.Services.AuthService>();
 builder.Services.AddSingleton<GmailEmailFilterManager.Services.EmailListService>();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
+    KnownProxies = { IPAddress.Parse("10.10.0.1") }
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
